@@ -1,0 +1,177 @@
+{
+  "id": "elne7vo086v8ve",
+  "name": "Friday Pickle Ball sync",
+  "format": "rotation",
+  "players": [
+    "Alicia",
+    "Ryota",
+    "Arvind",
+    "Vasu",
+    "Senthil",
+    "Barry",
+    "Kenta"
+  ],
+  "teams": [
+    {
+      "id": "3d6ofl9",
+      "players": [
+        "Alicia",
+        "Arvind"
+      ]
+    },
+    {
+      "id": "nbi4bsr",
+      "players": [
+        "Ryota",
+        "Senthil"
+      ]
+    },
+    {
+      "id": "37ejysu",
+      "players": [
+        "Kenta",
+        "Vasu"
+      ]
+    },
+    {
+      "id": "geebeph",
+      "players": [
+        "Barry",
+        "Senthil"
+      ]
+    },
+    {
+      "id": "rbsserc",
+      "players": [
+        "Arvind",
+        "Ryota"
+      ]
+    },
+    {
+      "id": "s5xx4k9",
+      "players": [
+        "Barry",
+        "Kenta"
+      ]
+    },
+    {
+      "id": "7ofl30s",
+      "players": [
+        "Alicia",
+        "Vasu"
+      ]
+    },
+    {
+      "id": "0wbhty0",
+      "players": [
+        "Arvind",
+        "Kenta"
+      ]
+    },
+    {
+      "id": "ra39qvr",
+      "players": [
+        "Alicia",
+        "Senthil"
+      ]
+    },
+    {
+      "id": "s89x3cl",
+      "players": [
+        "Barry",
+        "Vasu"
+      ]
+    },
+    {
+      "id": "z8hzlmp",
+      "players": [
+        "Kenta",
+        "Ryota"
+      ]
+    },
+    {
+      "id": "dmkqait",
+      "players": [
+        "Senthil",
+        "Vasu"
+      ]
+    }
+  ],
+  "rounds": [
+    [
+      {
+        "a": "3d6ofl9",
+        "b": "nbi4bsr"
+      }
+    ],
+    [
+      {
+        "a": "37ejysu",
+        "b": "geebeph"
+      }
+    ],
+    [
+      {
+        "a": "rbsserc",
+        "b": "s5xx4k9"
+      }
+    ],
+    [
+      {
+        "a": "7ofl30s",
+        "b": "0wbhty0"
+      }
+    ],
+    [
+      {
+        "a": "ra39qvr",
+        "b": "s89x3cl"
+      }
+    ],
+    [
+      {
+        "a": "z8hzlmp",
+        "b": "dmkqait"
+      }
+    ]
+  ],
+  "rests": [
+    [
+      "Vasu",
+      "Barry",
+      "Kenta"
+    ],
+    [
+      "Alicia",
+      "Ryota",
+      "Arvind"
+    ],
+    [
+      "Alicia",
+      "Vasu",
+      "Senthil"
+    ],
+    [
+      "Ryota",
+      "Senthil",
+      "Barry"
+    ],
+    [
+      "Ryota",
+      "Arvind",
+      "Kenta"
+    ],
+    [
+      "Alicia",
+      "Arvind",
+      "Barry"
+    ]
+  ],
+  "duration": 30,
+  "sched": {
+    "start": "",
+    "interval": 30,
+    "courts": 1,
+    "venue": ""
+  }
+}

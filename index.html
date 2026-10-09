@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
 <title>Doubles Bracket Maker</title>
 <style>
   :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --win:#22c55e; --warn:#f59e0b; }
@@ -58,6 +59,7 @@
   .slot.win .name::before { content:"\2713  "; color:var(--win); }
   .slot.lose .name { color:var(--muted); text-decoration:line-through; }
   .slot.tbd .name, .slot.bye .name { color:var(--muted); font-style:italic; }
+  .slot b { min-width:26px; text-align:center; }
   .slot input[type=number] { width:48px; text-align:center; padding:2px 4px; }
   .sched { display:flex; gap:6px; padding:6px 8px; background:rgba(0,0,0,.18); flex-wrap:wrap; }
   .sched input { font-size:12px; padding:3px 6px; }
@@ -569,6 +571,10 @@ async function decodeShare(code){
    APP (DOM, storage, rendering)
    ===================================================================== */
 const KEY = 'bracketmaker.v2';
+// ?view=live : read-only page for everyone. Shows the published tournament.json that sits next to this file
+// and re-checks it every minute. Nothing is read from or written to the visitor's browser storage.
+const VIEW = typeof location !== 'undefined' && /[?&]view=live\b/.test(location.search);
+let liveStamp = '', liveMsg = 'Loading...';
 let S, view = 'setup', persistent = true;
 let draft = freshDraft();
 
@@ -595,6 +601,7 @@ function loadState(){
   } catch { return empty; }
 }
 function save(){
+  if (VIEW) return;
   try { localStorage.setItem(KEY, JSON.stringify(S)); persistent = true; } catch { persistent = false; }
 }
 const cur = () => S.tournaments.find(x => x.id === S.currentId) || null;
@@ -633,13 +640,14 @@ function slotHTML(t, r, m, s){
   const cls = id === null ? 'bye' : !id ? 'tbd' : (w ? (w === id ? 'win' : 'lose') : '');
   const other = slot(t, r, m, 1 - s);
   const key = s ? 'sb' : 'sa';
-  const input = (id && other) ? `<input type="number" min="0" value="${esc(mt[key])}" data-change="score" data-r="${r}" data-m="${m}" data-key="${key}" title="Score">` : '';
-  const click = (id && other) ? ` data-click="pick" data-r="${r}" data-m="${m}" data-team="${esc(id)}"` : '';
+  const input = VIEW ? (Number.isFinite(mt[key]) ? `<b>${mt[key]}</b>` : '')
+    : (id && other) ? `<input type="number" min="0" value="${esc(mt[key])}" data-change="score" data-r="${r}" data-m="${m}" data-key="${key}" title="Score">` : '';
+  const click = (!VIEW && id && other) ?` data-click="pick" data-r="${r}" data-m="${m}" data-team="${esc(id)}"` : '';
   return `<div class="slot ${cls}"${click}><span class="name">${esc(teamName(t, id))}</span>${input}</div>`;
 }
 function matchCard(t, r, m, label){
   const mt = t.rounds[r][m], bye = isBye(t, r, m);
-  const sched = bye ? '' : `<div class="sched">
+  const sched = bye ? '' : VIEW ? `<div class="sched note">📅 ${mt.when ? esc(fmtWhen(mt.when)) : 'time TBD'}${mt.where ? ' @ ' + esc(mt.where) : ''}</div>` : `<div class="sched">
       <input type="datetime-local" value="${esc(mt.when)}" data-change="when" data-r="${r}" data-m="${m}">
       <input type="text" placeholder="Where (court/table)" value="${esc(mt.where)}" data-change="where" data-r="${r}" data-m="${m}"></div>`;
   return `<div class="match${bye ? ' bye' : ''}">${label ? `<div class="rlabel">${esc(label)}</div>` : ''}${slotHTML(t, r, m, 0)}${slotHTML(t, r, m, 1)}${sched}</div>`;
@@ -672,6 +680,7 @@ function scheduleHTML(t){
   t.rounds.forEach((ms, r) => ms.forEach((mt, m) => { if (!isBye(t, r, m)) items.push({ r, m, when: mt.when || '' }); }));
   items.sort((x, y) => (x.when && y.when) ? (x.when < y.when ? -1 : x.when > y.when ? 1 : x.r - y.r || x.m - y.m) : x.when ? -1 : y.when ? 1 : x.r - y.r || x.m - y.m);
   const sched = items.filter(x => x.when).length;
+  if (VIEW) return `<div class="list">${items.map(x => matchCard(t, x.r, x.m, `${roundName(t, x.r)} · match ${x.m + 1}`)).join('')}</div>`;
   return `<div class="form">
       <label>First match<input type="datetime-local" value="${esc(s.start)}" data-change="sched" data-key="start"></label>
       <label>Minutes between<input type="number" min="1" style="width:80px" value="${esc(s.interval)}" data-change="sched" data-key="interval"></label>
@@ -699,14 +708,14 @@ function shareHTML(t){
       ${fileWarn}
       <p class="note">The link carries the whole tournament inside it. Whoever opens it gets their own copy saved in their browser; results they enter are not synced back to you.</p>
     </div>
-    <div class="card" style="max-width:760px">
+    ${VIEW ? '' : `<div class="card" style="max-width:760px">
       <h2>Backup</h2>
       <div class="row" style="margin-top:8px">
         <button class="ghost" data-click="exportOne">Download this tournament</button>
         <button class="ghost" data-click="exportAll">Backup everything</button>
         <button class="ghost" data-click="importBtn">Import file</button>
       </div>
-    </div>`;
+    </div>`}`;
 }
 
 function genPreviewHTML(){
@@ -757,13 +766,19 @@ function setupHTML(){
 
 function render(){
   const t = cur();
+  if (VIEW) {
+    $('#hdr').innerHTML = `<h1>🏓 ${esc(t ? t.name : 'Doubles Bracket Maker')}</h1><span class="spacer"></span><span class="note" style="margin:0">Live view · <span id="stamp">${esc(liveStamp)}</span></span>`;
+    $('#banner').textContent = '';
+    if (!t) { $('#app').innerHTML = `<div class="card"><h2>No live tournament yet</h2><p class="note">${esc(liveMsg)}</p></div>`; return; }
+    if (view === 'setup') view = 'bracket';
+  }
   if (!t) view = 'setup';
   if (view === 'standings' && t && t.format === 'knockout') view = 'bracket';
   const sel = S.tournaments.length
     ? `<select data-change="sel">${S.tournaments.map(x => `<option value="${esc(x.id)}"${x.id === S.currentId ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : '';
-  $('#hdr').innerHTML = `<h1>🏓 Doubles Bracket Maker</h1>${sel}<span class="spacer"></span>
+  if (!VIEW) $('#hdr').innerHTML = `<h1>🏓 Doubles Bracket Maker</h1>${sel}<span class="spacer"></span>
     <button class="ghost" data-click="importBtn">Import</button><button class="ghost" data-click="new">+ New</button>${t ? '<button class="danger" data-click="del">Delete</button>' : ''}`;
-  $('#banner').textContent = persistent ? '' : '⚠ Your browser is blocking saved data, so nothing will be remembered after you close this page. Use Share → Backup to keep your tournament.';
+  if (!VIEW) $('#banner').textContent = persistent ? '' : '⚠ Your browser is blocking saved data, so nothing will be remembered after you close this page. Use Share → Backup to keep your tournament.';
   const sc = document.querySelector('.bracket,.rr'), sx = sc ? sc.scrollLeft : 0, sy = window.scrollY;
   let html = '';
   if (view === 'setup') html = setupHTML();
@@ -852,6 +867,7 @@ document.addEventListener('click', async e => {
   const el = e.target.closest('[data-click]');
   if (!el) return;
   const t = cur(), ds = el.dataset;
+  if (VIEW && !['tab', 'copyMsg', 'copyLink', 'ics'].includes(ds.click)) return;     // read-only page
   switch (ds.click) {
     case 'tab': view = ds.view; render(); break;
     case 'new': draft = freshDraft(); view = 'setup'; render(); break;
@@ -878,6 +894,7 @@ document.addEventListener('click', async e => {
     case 'clearTimes': if (confirm('Remove every match time and place?')) { clearSchedule(t); commit(); } break;
     case 'copyMsg': toast(await copyText(slackText(t)) ? 'Copied. Paste it in Slack' : 'Copy failed: select the text and copy it'); break;
     case 'copyLink':
+      if (VIEW) { toast(await copyText(location.href.split('#')[0]) ? 'Link copied' : 'Copy failed'); break; }
       try { toast(await copyText(location.href.split('#')[0] + '#t=' + await encodeShare(t)) ? 'Link copied' : 'Copy failed'); }
       catch { toast('Could not build the link'); }
       break;
@@ -897,6 +914,7 @@ document.addEventListener('input', e => {
   else if (k === 'text') { draft.text = e.target.value; draft.teams = null; draft.gen = null; }
 });
 document.addEventListener('change', e => {
+  if (VIEW) return;
   const el = e.target, ds = el.dataset, t = cur();
   if (el.id === 'file') return importFile(el);
   switch (ds.change) {
@@ -961,11 +979,34 @@ async function boot(){
   });
 }
 
+async function bootLive(){
+  S = { roster: [], tournaments: [], currentId: null };
+  view = 'bracket';
+  let last = '';
+  const load = async first => {
+    try {
+      const r = await fetch('tournament.json?' + Date.now(), { cache: 'no-store' });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const txt = await r.text(), o = JSON.parse(txt);
+      if (!validTournament(o)) throw new Error('bad file');
+      const d = new Date();
+      liveStamp = `checked ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      if (txt !== last) { last = txt; S.tournaments = [normalizeTournament(o)]; S.currentId = o.id; render(); }
+      else { const el = $('#stamp'); if (el) el.textContent = liveStamp; }
+    } catch {
+      if (first) { liveMsg = 'Nothing has been published here yet, or the page could not load it. Try again in a minute.'; render(); }
+    }
+  };
+  render();
+  await load(true);
+  setInterval(() => load(false), 60000);
+}
+
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { convertV1, buildRotation, playerStandings, parseNames, pairUp, parseTeams, seedOrder, buildKnockout, buildRoundRobin, newTournament, slot, winner, isBye, teamName, roundName,
     setWinner, setScore, standings, champion, autoSchedule, clearSchedule, fmtWhen, fmtLocal, parseLocal, slackText, icsText, validTournament, normalizeTournament,
     encodeShare, decodeShare, addToText };
-} else if (typeof document !== 'undefined') boot();
+} else if (typeof document !== 'undefined') { if (VIEW) bootLive(); else boot(); }
 </script>
 </body>
 </html>
