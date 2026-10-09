@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Doubles Bracket Maker</title>
+<style>
+  :root { --bg:#0f172a; --panel:#1e293b; --line:#334155; --text:#e2e8f0; --muted:#94a3b8; --accent:#38bdf8; --win:#22c55e; --warn:#f59e0b; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:14px/1.45 system-ui,Segoe UI,sans-serif; background:var(--bg); color:var(--text); }
+  header { display:flex; align-items:center; gap:10px; padding:10px 20px; background:var(--panel); border-bottom:1px solid var(--line); flex-wrap:wrap; }
+  header h1 { font-size:18px; margin:0 8px 0 0; }
+  header .spacer { flex:1; }
+  button { background:var(--accent); color:#04263a; border:0; border-radius:6px; padding:7px 14px; font:inherit; font-weight:600; cursor:pointer; }
+  button.ghost { background:transparent; color:var(--text); border:1px solid var(--line); }
+  button.danger { background:transparent; color:#f87171; border:1px solid #7f1d1d; }
+  button:hover { filter:brightness(1.12); }
+  select, input[type=text], input[type=number], input[type=datetime-local], textarea {
+    background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font:inherit; color-scheme:dark; }
+  main { padding:18px 20px 60px; }
+  .banner { background:#78350f; color:#fde68a; padding:8px 20px; font-size:13px; }
+  .banner:empty { display:none; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:18px; max-width:620px; margin:0 auto 16px; }
+  .card h2 { margin:0 0 6px; font-size:16px; }
+  .card label.f { display:block; margin:14px 0 4px; color:var(--muted); }
+  .card input[type=text], .card textarea { width:100%; }
+  .card textarea { height:170px; resize:vertical; }
+  .opts { display:flex; gap:18px; flex-wrap:wrap; margin-top:6px; }
+  .opts label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .chips { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+  .chip { display:inline-flex; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:999px; overflow:hidden; }
+  .chip button { background:transparent; color:var(--text); padding:3px 10px; border-radius:0; font-weight:500; }
+  .chip button.x { padding:3px 8px 3px 2px; color:var(--muted); }
+  .chip.on { border-color:var(--accent); background:rgba(56,189,248,.15); }
+  .msgs { margin:10px 0 0; padding:0; list-style:none; color:var(--warn); font-size:13px; }
+  .msgs.err { color:#f87171; }
+  .teams { margin:8px 0; padding-left:22px; }
+  .teams li { padding:2px 0; }
+  .guest { color:var(--warn); }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-top:14px; }
+  .tabs { display:flex; gap:6px; margin-bottom:16px; flex-wrap:wrap; }
+  .tabs button { background:transparent; color:var(--muted); border:1px solid var(--line); border-radius:999px; }
+  .tabs button.on { background:var(--accent); color:#04263a; border-color:var(--accent); }
+  .champ { margin:0 0 16px; padding:12px; text-align:center; background:linear-gradient(90deg,#facc15,#f59e0b); color:#422006; border-radius:10px; font-size:17px; font-weight:800; }
+  .bracket { display:flex; gap:34px; overflow-x:auto; padding-bottom:16px; align-items:stretch; }
+  .round { display:flex; flex-direction:column; min-width:250px; }
+  .round h3, .rrround h3 { margin:0 0 10px; text-align:center; color:var(--muted); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
+  .matches { display:flex; flex-direction:column; justify-content:space-around; flex:1; gap:14px; }
+  .rr { display:grid; grid-template-columns:repeat(auto-fill,minmax(270px,1fr)); gap:22px; }
+  .rrround .matches { gap:10px; }
+  .match { background:var(--panel); border:1px solid var(--line); border-radius:8px; overflow:hidden; }
+  .match.bye { opacity:.55; }
+  .slot { display:flex; align-items:center; gap:6px; padding:6px 10px; border-bottom:1px solid var(--line); min-height:34px; }
+  .slot[data-click] { cursor:pointer; }
+  .slot[data-click]:hover { background:#27364d; }
+  .slot .name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .slot.win { background:rgba(34,197,94,.15); font-weight:700; }
+  .slot.win .name::before { content:"\2713  "; color:var(--win); }
+  .slot.lose .name { color:var(--muted); text-decoration:line-through; }
+  .slot.tbd .name, .slot.bye .name { color:var(--muted); font-style:italic; }
+  .slot input[type=number] { width:48px; text-align:center; padding:2px 4px; }
+  .sched { display:flex; gap:6px; padding:6px 8px; background:rgba(0,0,0,.18); flex-wrap:wrap; }
+  .sched input { font-size:12px; padding:3px 6px; }
+  .sched input[type=text] { flex:1; min-width:70px; }
+  .rlabel { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; padding:5px 10px 0; }
+  .list { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:12px; }
+  table { border-collapse:collapse; min-width:380px; }
+  th, td { padding:6px 12px; border-bottom:1px solid var(--line); text-align:center; }
+  th:nth-child(2), td:nth-child(2) { text-align:left; }
+  .form { display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end; background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:16px; }
+  .form label { display:flex; flex-direction:column; gap:3px; color:var(--muted); font-size:12px; }
+  .share textarea { width:100%; height:300px; font-family:Consolas,monospace; font-size:13px; }
+  .note { color:var(--muted); font-size:13px; margin:8px 0 0; }
+  #toast { position:fixed; left:50%; bottom:24px; transform:translateX(-50%); background:#0b1220; border:1px solid var(--accent); color:var(--text); padding:8px 16px; border-radius:8px; opacity:0; pointer-events:none; transition:opacity .2s; }
+  #toast.on { opacity:1; }
+  @media print { header, .tabs, .sched, .form, button, .banner { display:none !important; } body { background:#fff; color:#000; } }
+</style>
+</head>
+<body>
+<header id="hdr"></header>
+<div class="banner" id="banner"></div>
+<main id="app"></main>
+<div id="toast"></div>
+<input type="file" id="file" accept=".json,application/json" hidden>
+
+<script>
+'use strict';
+/* =====================================================================
+   PURE LOGIC  (no DOM access - can be unit-tested under node)
+   Tournament: {id, name, format:'knockout'|'roundrobin', teams:[{id,players:[p1,p2]}],
+                rounds:[[match]], duration, sched}
+   match: {a,b (team id | null=bye),  w (winner team id), sa, sb (scores), when 'YYYY-MM-DDTHH:mm', where}
+   Knockout rounds after the first have no a/b: they are derived from the winners of the feeder matches.
+   ===================================================================== */
+const uid = () => Math.random().toString(36).slice(2, 9);
+const pad = n => String(n).padStart(2, '0');
+const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function shuffled(a){
+  const b = a.slice();
+  for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; }
+  return b;
+}
+
+/* ---- players and teams ---- */
+// "Alice, Bob\nCarol" -> unique names (case-insensitive), duplicates reported
+function parseNames(text){
+  const seen = new Set(), names = [], dups = [];
+  for (const raw of String(text).split(/[\n,;]+/)) {
+    const n = raw.trim().replace(/\s+/g, ' ');
+    if (!n) continue;
+    const k = n.toLowerCase();
+    if (seen.has(k)) { dups.push(n); continue; }
+    seen.add(k); names.push(n);
+  }
+  return { names, dups };
+}
+// random (or in-order) pairing; an odd one out gets a 'Guest' partner
+function pairUp(names, random){
+  const list = random ? shuffled(names) : names.slice();
+  const teams = [];
+  for (let i = 0; i < list.length; i += 2)
+    teams.push({ id: uid(), players: i + 1 < list.length ? [list[i], list[i + 1]] : [list[i], 'Guest'] });
+  return teams;
+}
+// one team per line: "Alice & Bob", "Alice + Bob", "Alice / Bob", "Alice and Bob"
+function parseTeams(text){
+  const teams = [], errors = [], used = new Set();
+  String(text).split('\n').forEach(line => {
+    line = line.trim();
+    if (!line) return;
+    const parts = line.split(/\s*(?:&|\+|\/|\band\b)\s*/i).map(s => s.trim()).filter(Boolean);
+    if (!parts.length) return;
+    if (parts.length > 2) { errors.push(`"${line}" has more than 2 players`); return; }
+    for (const p of parts) {
+      const k = p.toLowerCase();
+      if (used.has(k)) errors.push(`${p} is in more than one team`);
+      used.add(k);
+    }
+    teams.push({ id: uid(), players: parts.length === 1 ? [parts[0], 'Guest'] : parts });
+  });
+  return { teams, errors };
+}
+
+/* ---- bracket construction ---- */
+// seed positions for a power-of-2 bracket: seeds 1 and 2 can only meet in the final
+function seedOrder(n){
+  let o = [1];
+  while (o.length < n) { const m = o.length * 2 + 1; o = o.flatMap(x => [x, m - x]); }
+  return o;
+}
+function buildKnockout(teamIds){
+  const size = 2 ** Math.ceil(Math.log2(Math.max(teamIds.length, 2)));
+  const seeds = seedOrder(size).map(s => s <= teamIds.length ? teamIds[s - 1] : null); // null = bye
+  const r0 = [];
+  for (let m = 0; m < size / 2; m++) r0.push({ a: seeds[2 * m], b: seeds[2 * m + 1] });
+  const rounds = [r0];
+  for (let n = size / 4; n >= 1; n /= 2) rounds.push(Array.from({ length: n }, () => ({})));
+  return rounds;
+}
+// circle method: every team plays every other team once; odd count gives each team one bye
+function buildRoundRobin(teamIds){
+  let ids = teamIds.slice();
+  if (ids.length % 2) ids.push(null);
+  const n = ids.length, rounds = [];
+  for (let r = 0; r < n - 1; r++) {
+    const ms = [];
+    for (let i = 0; i < n / 2; i++) {
+      const a = ids[i], b = ids[n - 1 - i];
+      ms.push(r % 2 ? { a: b, b: a } : { a, b });
+    }
+    rounds.push(ms);
+    ids = [ids[0], ids[n - 1], ...ids.slice(1, n - 1)];
+  }
+  return rounds;
+}
+// Rotating partners ("americano"): every match is a fresh random 2v2 from the whole group.
+// Each match picks the 4 players who have played least, then the split into pairs that repeats
+// partners/opponents least. Many random trials, keep the fairest.
+function buildRotation(players, matches, rng = Math.random){
+  const n = players.length;
+  const combos = [];
+  for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) for (let c = b + 1; c < n; c++) for (let d = c + 1; d < n; d++) combos.push([a, b, c, d]);
+  let best = null;
+  for (let trial = 0; trial < 300; trial++) {
+    const played = new Array(n).fill(0), lastRest = new Array(n).fill(0);
+    const partner = Array.from({ length: n }, () => new Array(n).fill(0)), opp = Array.from({ length: n }, () => new Array(n).fill(0));
+    const seq = []; let total = 0;
+    for (let k = 0; k < matches; k++) {
+      let pick = null;
+      for (const q of combos) {
+        const [a, b, c, d] = q;
+        const base = 10 * (played[a] + played[b] + played[c] + played[d]) - (k - lastRest[a] + k - lastRest[b] + k - lastRest[c] + k - lastRest[d]) * 0.2;
+        for (const [p1, p2, o1, o2] of [[a, b, c, d], [a, c, b, d], [a, d, b, c]]) {
+          const cost = base + 4 * (partner[p1][p2] ** 2 + partner[o1][o2] ** 2)
+            + opp[p1][o1] ** 2 + opp[p1][o2] ** 2 + opp[p2][o1] ** 2 + opp[p2][o2] ** 2 + rng() * 0.6;
+          if (!pick || cost < pick.cost) pick = { cost, side: [[p1, p2], [o1, o2]], q };
+        }
+      }
+      const [[p1, p2], [o1, o2]] = pick.side;
+      partner[p1][p2]++; partner[p2][p1]++; partner[o1][o2]++; partner[o2][o1]++;
+      for (const x of [p1, p2]) for (const y of [o1, o2]) { opp[x][y]++; opp[y][x]++; }
+      pick.q.forEach(i => { played[i]++; lastRest[i] = k + 1; });
+      total += pick.cost; seq.push(pick.side);
+    }
+    const score = total + 60 * (Math.max(...played) - Math.min(...played));
+    if (!best || score < best.score) best = { score, seq };
+  }
+  const teams = [], byKey = new Map();
+  const teamOf = pair => {
+    const names = pair.map(i => players[i]).sort((x, y) => x.localeCompare(y));
+    const key = names.join('\u0000');
+    if (!byKey.has(key)) { const x = { id: uid(), players: names }; byKey.set(key, x); teams.push(x); }
+    return byKey.get(key).id;
+  };
+  const rounds = [], rests = [];
+  best.seq.forEach(([p, o]) => {
+    rounds.push([{ a: teamOf(p), b: teamOf(o) }]);
+    const on = new Set([...p, ...o]);
+    rests.push(players.filter((_, i) => !on.has(i)));
+  });
+  return { teams, rounds, rests };
+}
+// per-player table for rotation tournaments
+function playerStandings(t){
+  const rows = new Map(t.players.map(p => [p, { name: p, P: 0, W: 0, L: 0, PF: 0, PA: 0 }]));
+  t.rounds.forEach((ms, r) => ms.forEach((mt, m) => {
+    const w = winner(t, r, m);
+    if (!w) return;
+    const A = t.teams.find(x => x.id === mt.a), B = t.teams.find(x => x.id === mt.b);
+    if (!A || !B) return;
+    const scored = Number.isFinite(mt.sa) && Number.isFinite(mt.sb);
+    for (const [team, own, other, won] of [[A, mt.sa, mt.sb, w === mt.a], [B, mt.sb, mt.sa, w === mt.b]])
+      team.players.forEach(p => {
+        const x = rows.get(p); if (!x) return;
+        x.P++; won ? x.W++ : x.L++;
+        if (scored) { x.PF += own; x.PA += other; }
+      });
+  }));
+  const out = [...rows.values()].map(x => ({ ...x, D: x.PF - x.PA }));
+  out.sort((x, y) => y.W - x.W || y.D - x.D || y.PF - x.PF || x.name.localeCompare(y.name));
+  return out;
+}
+function newTournament({ name, format, teams, shuffle, gen, players }){
+  if (format === 'rotation')
+    return { id: uid() + uid(), name: name || 'Doubles Night', format, players: players.slice(), teams: gen.teams, rounds: gen.rounds, rests: gen.rests,
+      duration: 30, sched: { start: '', interval: 30, courts: 1, venue: '' } };
+  const list = (shuffle && format === 'knockout') ? shuffled(teams) : teams.slice();
+  const ids = list.map(x => x.id);
+  return {
+    id: uid() + uid(), name: name || 'Doubles Tournament', format, teams: list,
+    rounds: format === 'knockout' ? buildKnockout(ids) : buildRoundRobin(ids),
+    duration: 30, sched: { start: '', interval: 30, courts: 1, venue: '' }
+  };
+}
+
+/* ---- resolving who plays whom ---- */
+// slot value: team id | null (bye) | '' (not decided yet)
+function slot(t, r, m, s){
+  const mt = t.rounds[r][m];
+  if (t.format !== 'knockout' || r === 0) return (s ? mt.b : mt.a) ?? null;
+  return winner(t, r - 1, 2 * m + s) ?? '';
+}
+function winner(t, r, m){
+  const a = slot(t, r, m, 0), b = slot(t, r, m, 1), w = t.rounds[r][m].w;
+  if (a === null && b) return b;          // bye: the other team advances
+  if (b === null && a) return a;
+  if (!a || !b) return null;              // an opponent is still TBD: nobody can have won yet
+  return (w && (w === a || w === b)) ? w : null;
+}
+const isBye = (t, r, m) => slot(t, r, m, 0) === null || slot(t, r, m, 1) === null;
+function teamName(t, id){
+  if (id === null) return 'BYE';
+  if (!id) return 'TBD';
+  const x = t.teams.find(q => q.id === id);
+  return x ? (x.name || x.players.join(' & ')) : 'TBD';
+}
+function roundName(t, r){
+  if (t.format === 'rotation') return 'Match ' + (r + 1);
+  if (t.format === 'roundrobin') return 'Round ' + (r + 1);
+  const left = t.rounds.length - r;
+  return left === 1 ? 'Final' : left === 2 ? 'Semifinals' : left === 3 ? 'Quarterfinals' : 'Round ' + (r + 1);
+}
+
+/* ---- results ---- */
+function clearDownstream(t, r, m){
+  let rr = r + 1, mm = m >> 1;
+  while (rr < t.rounds.length) {
+    const mt = t.rounds[rr][mm];
+    delete mt.w; delete mt.sa; delete mt.sb;
+    rr++; mm >>= 1;
+  }
+}
+function afterChange(t, r, m, before){
+  if (t.format === 'knockout' && winner(t, r, m) !== before) clearDownstream(t, r, m);
+}
+function setWinner(t, r, m, id){
+  if (!id || !slot(t, r, m, 0) || !slot(t, r, m, 1)) return;   // needs two real teams
+  const mt = t.rounds[r][m], before = winner(t, r, m);
+  if (mt.w === id) delete mt.w; else mt.w = id;
+  afterChange(t, r, m, before);
+}
+function setScore(t, r, m, key, val){
+  if (!slot(t, r, m, 0) || !slot(t, r, m, 1)) return;
+  const mt = t.rounds[r][m], before = winner(t, r, m);
+  const n = val === '' || val == null ? NaN : Number(val);
+  if (Number.isFinite(n) && n >= 0) mt[key] = n; else delete mt[key];
+  if (Number.isFinite(mt.sa) && Number.isFinite(mt.sb) && mt.sa !== mt.sb) {
+    const id = mt.sa > mt.sb ? slot(t, r, m, 0) : slot(t, r, m, 1);
+    if (id) mt.w = id;
+  }
+  afterChange(t, r, m, before);
+}
+function standings(t){
+  const rows = new Map(t.teams.map(x => [x.id, { id: x.id, P: 0, W: 0, L: 0, PF: 0, PA: 0 }]));
+  t.rounds.forEach((ms, r) => ms.forEach((mt, m) => {
+    if (isBye(t, r, m)) return;
+    const w = winner(t, r, m);
+    if (!w) return;
+    const A = rows.get(mt.a), B = rows.get(mt.b);
+    if (!A || !B) return;
+    A.P++; B.P++;
+    (w === mt.a ? A : B).W++; (w === mt.a ? B : A).L++;
+    if (Number.isFinite(mt.sa) && Number.isFinite(mt.sb)) { A.PF += mt.sa; A.PA += mt.sb; B.PF += mt.sb; B.PA += mt.sa; }
+  }));
+  const out = [...rows.values()].map(x => ({ ...x, D: x.PF - x.PA }));
+  out.sort((x, y) => y.W - x.W || y.D - x.D || y.PF - x.PF || teamName(t, x.id).localeCompare(teamName(t, y.id)));
+  return out;
+}
+function champion(t){
+  if (t.format === 'knockout') return winner(t, t.rounds.length - 1, 0);
+  if (t.format === 'rotation') return null;
+  let any = false;
+  for (let r = 0; r < t.rounds.length; r++) for (let m = 0; m < t.rounds[r].length; m++) {
+    if (isBye(t, r, m)) continue;
+    any = true;
+    if (!winner(t, r, m)) return null;
+  }
+  if (!any) return null;
+  const s = standings(t);
+  if (s.length > 1 && s[0].W === s[1].W && s[0].D === s[1].D && s[0].PF === s[1].PF) return null;   // dead heat: no champion
+  return s[0].id;
+}
+
+/* ---- scheduling ---- */
+function fmtLocal(d){ return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`; }
+function parseLocal(s){
+  const m = /^(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d)$/.exec(s || '');
+  return m ? new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]) : null;
+}
+function fmtWhen(s){
+  const d = parseLocal(s);
+  return d ? `${DAYS[d.getDay()]} ${d.getDate()} ${MONTHS[d.getMonth()]}, ${pad(d.getHours())}:${pad(d.getMinutes())}` : '';
+}
+// Fill unscheduled playable matches. Every round starts on a fresh time row so a team never
+// has two matches at once. Returns how many matches were scheduled.
+function autoSchedule(t, { start, interval, courts, venue }){
+  const st = parseLocal(start);
+  interval = Math.max(1, Math.floor(Number(interval)) || 30);
+  courts = Math.max(1, Math.floor(Number(courts)) || 1);
+  if (!st) return 0;
+  let row = 0, count = 0;
+  t.rounds.forEach((ms, r) => {
+    // time+place already used in this round (set by hand) must not be reused
+    const taken = new Set(ms.filter(mt => mt.when).map(mt => mt.when + '|' + (mt.where || '')));
+    let k = 0;
+    ms.forEach((mt, m) => {
+      if (isBye(t, r, m) || mt.when) return;
+      for (;; k++) {
+        const when = fmtLocal(new Date(st.getFullYear(), st.getMonth(), st.getDate(), st.getHours(), st.getMinutes() + (row + Math.floor(k / courts)) * interval));
+        const where = courts > 1 ? `${venue || 'Court'} ${(k % courts) + 1}` : (venue || '');
+        if (taken.has(when + '|' + where)) continue;
+        taken.add(when + '|' + where);
+        mt.when = when;
+        if (!mt.where) mt.where = where;
+        count++; k++;
+        break;
+      }
+    });
+    // the next round starts after everything in this round (hand-set times included)
+    ms.forEach(mt => {
+      const d = parseLocal(mt.when);
+      if (d) row = Math.max(row, Math.round((d - st) / (interval * 60000)) + 1);
+    });
+  });
+  return count;
+}
+function clearSchedule(t){ t.rounds.forEach(ms => ms.forEach(mt => { delete mt.when; delete mt.where; })); }
+
+/* ---- Slack message ---- */
+function matchLine(t, r, m){
+  const mt = t.rounds[r][m];
+  if (isBye(t, r, m)) return null;
+  const a = slot(t, r, m, 0), b = slot(t, r, m, 1), w = winner(t, r, m);
+  const A = teamName(t, a), B = teamName(t, b);
+  if (w) {
+    const win = w === a, wn = win ? A : B, ln = win ? B : A;
+    const ws = win ? mt.sa : mt.sb, ls = win ? mt.sb : mt.sa;
+    const sc = Number.isFinite(ws) && Number.isFinite(ls) ? ` (${ws}-${ls})` : '';
+    return `• :white_check_mark: *${wn}* def. ${ln}${sc}`;
+  }
+  return `• ${A} vs ${B} — ${mt.when ? fmtWhen(mt.when) : '_time TBD_'}${mt.where ? ' @ ' + mt.where : ''}`;
+}
+function slackText(t){
+  const L = [];
+  if (t.format === 'rotation') {
+    L.push(`:trophy: *${t.name}* — rotating-partner doubles, ${t.players.length} players, ${t.rounds.length} matches`);
+    L.push('', `*Players*: ${t.players.join(', ')}`);
+    const lb = playerStandings(t);
+    if (lb.some(x => x.P > 0)) {
+      L.push('', '*Leaderboard*', '```');
+      lb.forEach((x, i) => L.push(`${i + 1}. ${x.name}  W${x.W} L${x.L}  (${x.D >= 0 ? '+' : ''}${x.D})`));
+      L.push('```');
+    }
+    t.rounds.forEach((_, r) => {
+      const rest = (t.rests && t.rests[r]) || [];
+      L.push('', `*${roundName(t, r)}*`, matchLine(t, r, 0) + (rest.length ? ` _(sitting out: ${rest.join(', ')})_` : ''));
+    });
+    return L.join('\n');
+  }
+  L.push(`:trophy: *${t.name}* — ${t.format === 'knockout' ? 'Knockout' : 'Round robin'} doubles, ${t.teams.length} teams`);
+  const ch = champion(t);
+  if (ch) L.push(`:crown: *Champion: ${teamName(t, ch)}*`);
+  L.push('', '*Teams*');
+  t.teams.forEach((x, i) => L.push(`${i + 1}. ${teamName(t, x.id)}`));
+  if (t.format === 'roundrobin') {
+    const st = standings(t);
+    if (st.some(x => x.P > 0)) {
+      L.push('', '*Standings*', '```');
+      st.forEach((x, i) => L.push(`${i + 1}. ${teamName(t, x.id)}  W${x.W} L${x.L}  (${x.D >= 0 ? '+' : ''}${x.D})`));
+      L.push('```');
+    }
+  }
+  t.rounds.forEach((ms, r) => {
+    const lines = ms.map((_, m) => matchLine(t, r, m)).filter(Boolean);
+    if (lines.length) L.push('', `*${roundName(t, r)}*`, ...lines);
+  });
+  return L.join('\n');
+}
+
+/* ---- calendar (.ics) ---- */
+const icsEsc = s => String(s).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n');
+const icsDate = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+function icsFold(line){
+  const out = [];
+  while (line.length > 72) {
+    let cut = 72;
+    const c = line.charCodeAt(cut - 1);
+    if (c >= 0xD800 && c <= 0xDBFF) cut--;         // never split an emoji (surrogate pair)
+    out.push(line.slice(0, cut)); line = ' ' + line.slice(cut);
+  }
+  out.push(line);
+  return out;
+}
+function icsText(t, nowIso){
+  const stamp = (nowIso || new Date().toISOString()).replace(/[-:]/g, '').replace(/\.\d+/, '');
+  const L = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Doubles Bracket Maker//EN', 'CALSCALE:GREGORIAN'];
+  let n = 0;
+  t.rounds.forEach((ms, r) => ms.forEach((mt, m) => {
+    if (isBye(t, r, m)) return;
+    const st = parseLocal(mt.when);
+    if (!st) return;
+    const dur = Math.max(1, Number(t.duration) || 30);
+    const en = new Date(st.getFullYear(), st.getMonth(), st.getDate(), st.getHours(), st.getMinutes() + dur);
+    const A = teamName(t, slot(t, r, m, 0)), B = teamName(t, slot(t, r, m, 1));
+    L.push('BEGIN:VEVENT', `UID:${t.id}-${r}-${m}@doubles-bracket-maker`, `DTSTAMP:${stamp}`,
+      `DTSTART:${icsDate(st)}`, `DTEND:${icsDate(en)}`,
+      ...icsFold(`SUMMARY:${icsEsc(`${A} vs ${B}`)}`),
+      ...icsFold(`DESCRIPTION:${icsEsc(`${t.name} - ${roundName(t, r)}`)}`));
+    if (mt.where) L.push(...icsFold(`LOCATION:${icsEsc(mt.where)}`));
+    L.push('END:VEVENT');
+    n++;
+  }));
+  L.push('END:VCALENDAR');
+  return { text: L.join('\r\n') + '\r\n', count: n };
+}
+
+/* ---- validation of imported / shared data ---- */
+function validTournament(t){
+  try {
+    if (!t || typeof t !== 'object') return false;
+    if (typeof t.id !== 'string' || !/^[\w-]{1,64}$/.test(t.id) || typeof t.name !== 'string') return false;
+    if (!['knockout', 'roundrobin', 'rotation'].includes(t.format)) return false;
+    if (t.format === 'rotation') {
+      if (!Array.isArray(t.players) || !t.players.every(p => typeof p === 'string')) return false;
+      if (t.rests !== undefined && !(Array.isArray(t.rests) && t.rests.every(r => Array.isArray(r) && r.every(p => typeof p === 'string')))) return false;
+    }
+    if (!Array.isArray(t.teams) || t.teams.length < 2 || t.teams.length > 128) return false;
+    const ids = new Set();
+    for (const x of t.teams) {
+      if (!x || typeof x.id !== 'string' || !Array.isArray(x.players) || !x.players.length || !x.players.every(p => typeof p === 'string')) return false;
+      ids.add(x.id);
+    }
+    if (ids.size !== t.teams.length) return false;
+    if (!Array.isArray(t.rounds) || !t.rounds.length || t.rounds.length > 200) return false;
+    if (!t.rounds.every(r => Array.isArray(r) && r.length && r.every(m => m && typeof m === 'object' && !Array.isArray(m)))) return false;
+    const ref = v => v === null || (typeof v === 'string' && ids.has(v));
+    const fixed = t.format !== 'knockout' ? t.rounds : [t.rounds[0]];
+    if (!fixed.every(r => r.every(m => ref(m.a) && ref(m.b)))) return false;
+    if (t.format === 'knockout') {
+      const n = t.rounds[0].length;
+      if (n < 1 || (n & (n - 1)) !== 0) return false;
+      if (t.rounds.length !== Math.log2(n) + 1) return false;
+      if (!t.rounds.every((r, i) => r.length === n / 2 ** i)) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+function normalizeTournament(t){
+  t.duration = Number(t.duration) > 0 ? Number(t.duration) : 30;
+  t.sched = Object.assign({ start: '', interval: 30, courts: 1, venue: '' }, t.sched && typeof t.sched === 'object' ? t.sched : {});
+  return t;
+}
+
+// first version of this app: single names, winner stored as the name, no format field
+function convertV1(o){
+  try {
+    if (!o || typeof o !== 'object' || o.format || !Array.isArray(o.rounds) || !Array.isArray(o.rounds[0])) return null;
+    const ids = new Map(), teams = [];
+    const idOf = n => {
+      if (n === null || n === undefined || n === '') return null;
+      n = String(n);
+      if (!ids.has(n)) { ids.set(n, uid()); teams.push({ id: ids.get(n), players: [n] }); }
+      return ids.get(n);
+    };
+    const rounds = o.rounds.map((ms, r) => ms.map(m => {
+      const x = {};
+      if (r === 0) { x.a = idOf(m.a); x.b = idOf(m.b); }
+      if (m.w) x.w = idOf(m.w);
+      if (Number.isFinite(m.sa)) x.sa = m.sa;
+      if (Number.isFinite(m.sb)) x.sb = m.sb;
+      return x;
+    }));
+    const t = { id: uid() + uid(), name: typeof o.name === 'string' && o.name ? o.name : 'Imported tournament', format: 'knockout', teams, rounds };
+    return validTournament(t) ? t : null;
+  } catch { return null; }
+}
+const upgrade = o => (o && o.format ? o : convertV1(o) || o);
+
+/* ---- share link encoding ---- */
+const b64u = bytes => {
+  let s = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+};
+const unb64u = str => {
+  const s = atob(str.replace(/-/g, '+').replace(/_/g, '/'));
+  const u = new Uint8Array(s.length);
+  for (let i = 0; i < s.length; i++) u[i] = s.charCodeAt(i);
+  return u;
+};
+async function runStream(bytes, stream){
+  return new Uint8Array(await new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer());
+}
+async function encodeShare(t){
+  const bytes = new TextEncoder().encode(JSON.stringify(t));
+  if (typeof CompressionStream !== 'undefined') return 'z' + b64u(await runStream(bytes, new CompressionStream('deflate-raw')));
+  return 'p' + b64u(bytes);
+}
+async function decodeShare(code){
+  let bytes = unb64u(code.slice(1));
+  if (code[0] === 'z') bytes = await runStream(bytes, new DecompressionStream('deflate-raw'));
+  else if (code[0] !== 'p') throw new Error('bad code');
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+/* =====================================================================
+   APP (DOM, storage, rendering)
+   ===================================================================== */
+const KEY = 'bracketmaker.v2';
+let S, view = 'setup', persistent = true;
+let draft = freshDraft();
+
+function freshDraft(){ return { name: '', format: 'rotation', mode: 'random', text: '', shuffle: true, matches: 6, teams: null, gen: null, players: [], msgs: [], errs: [] }; }
+
+/* storage never throws: if the browser blocks it, the app still works (just without memory) */
+function loadState(){
+  const empty = { roster: [], tournaments: [], currentId: null };
+  try { localStorage.setItem('__probe', '1'); localStorage.removeItem('__probe'); } catch { persistent = false; return empty; }
+  try {
+    const raw = localStorage.getItem(KEY);
+    if (!raw) {                                   // nothing saved yet: pick up a bracket made with the first version
+      const old = convertV1(JSON.parse(localStorage.getItem('bracketmaker.v1') || 'null'));
+      if (!old) return empty;
+      return { roster: [], tournaments: [normalizeTournament(old)], currentId: old.id };
+    }
+    const s = JSON.parse(raw);
+    if (!s || !Array.isArray(s.tournaments)) return empty;
+    return {
+      roster: Array.isArray(s.roster) ? s.roster.filter(x => typeof x === 'string') : [],
+      tournaments: s.tournaments.filter(validTournament).map(normalizeTournament),
+      currentId: s.currentId || null
+    };
+  } catch { return empty; }
+}
+function save(){
+  try { localStorage.setItem(KEY, JSON.stringify(S)); persistent = true; } catch { persistent = false; }
+}
+const cur = () => S.tournaments.find(x => x.id === S.currentId) || null;
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function toast(msg){
+  const el = $('#toast');
+  el.textContent = msg; el.classList.add('on');
+  clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), 2400);
+}
+async function copyText(text){
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    let ok = false;
+    try { ok = document.execCommand('copy'); } catch {}
+    ta.remove();
+    return ok;
+  }
+}
+function download(name, text, mime){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([text], { type: mime }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+const fileName = (t, ext) => (t.name || 'tournament').replace(/[^\w-]+/g, '_') + ext;
+
+/* ---- views ---- */
+function slotHTML(t, r, m, s){
+  const mt = t.rounds[r][m], id = slot(t, r, m, s), w = winner(t, r, m);
+  const cls = id === null ? 'bye' : !id ? 'tbd' : (w ? (w === id ? 'win' : 'lose') : '');
+  const other = slot(t, r, m, 1 - s);
+  const key = s ? 'sb' : 'sa';
+  const input = (id && other) ? `<input type="number" min="0" value="${esc(mt[key])}" data-change="score" data-r="${r}" data-m="${m}" data-key="${key}" title="Score">` : '';
+  const click = (id && other) ? ` data-click="pick" data-r="${r}" data-m="${m}" data-team="${esc(id)}"` : '';
+  return `<div class="slot ${cls}"${click}><span class="name">${esc(teamName(t, id))}</span>${input}</div>`;
+}
+function matchCard(t, r, m, label){
+  const mt = t.rounds[r][m], bye = isBye(t, r, m);
+  const sched = bye ? '' : `<div class="sched">
+      <input type="datetime-local" value="${esc(mt.when)}" data-change="when" data-r="${r}" data-m="${m}">
+      <input type="text" placeholder="Where (court/table)" value="${esc(mt.where)}" data-change="where" data-r="${r}" data-m="${m}"></div>`;
+  return `<div class="match${bye ? ' bye' : ''}">${label ? `<div class="rlabel">${esc(label)}</div>` : ''}${slotHTML(t, r, m, 0)}${slotHTML(t, r, m, 1)}${sched}</div>`;
+}
+function champHTML(t){
+  const ch = champion(t);
+  return ch ? `<div class="champ">🏆 ${t.format === 'knockout' ? 'Champions' : 'Winners'}: ${esc(teamName(t, ch))}</div>` : '';
+}
+function bracketHTML(t){
+  if (t.format === 'knockout')
+    return `<div class="bracket">${t.rounds.map((ms, r) => `<div class="round"><h3>${roundName(t, r)}</h3><div class="matches">${ms.map((_, m) => matchCard(t, r, m)).join('')}</div></div>`).join('')}</div>`;
+  return `<div class="rr">${t.rounds.map((ms, r) => {
+    const rest = t.format === 'rotation' && t.rests && t.rests[r] && t.rests[r].length ? `<div class="note" style="margin:6px 2px 0">Sitting out: ${esc(t.rests[r].join(', '))}</div>` : '';
+    return `<div class="rrround"><h3>${roundName(t, r)}</h3><div class="matches">${ms.map((_, m) => matchCard(t, r, m)).join('')}</div>${rest}</div>`;
+  }).join('')}</div>`;
+}
+function standingsHTML(t){
+  if (t.format === 'rotation') {
+    const rows = playerStandings(t).map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.name)}</td><td>${x.P}</td><td>${x.W}</td><td>${x.L}</td><td>${x.PF}-${x.PA}</td><td>${x.D > 0 ? '+' : ''}${x.D}</td></tr>`).join('');
+    return `<table><tr><th>#</th><th>Player</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th></tr>${rows}</table>
+      <p class="note">Ranked by wins, then point difference (needs scores entered). Each player is credited with their team's result.</p>`;
+  }
+  const rows = standings(t).map((x, i) => `<tr><td>${i + 1}</td><td>${esc(teamName(t, x.id))}</td><td>${x.P}</td><td>${x.W}</td><td>${x.L}</td><td>${x.PF}-${x.PA}</td><td>${x.D > 0 ? '+' : ''}${x.D}</td></tr>`).join('');
+  return `<table><tr><th>#</th><th>Team</th><th>P</th><th>W</th><th>L</th><th>Pts</th><th>+/-</th></tr>${rows}</table>
+    <p class="note">Ranked by wins, then point difference (needs scores entered).</p>`;
+}
+function scheduleHTML(t){
+  const s = t.sched;
+  const items = [];
+  t.rounds.forEach((ms, r) => ms.forEach((mt, m) => { if (!isBye(t, r, m)) items.push({ r, m, when: mt.when || '' }); }));
+  items.sort((x, y) => (x.when && y.when) ? (x.when < y.when ? -1 : x.when > y.when ? 1 : x.r - y.r || x.m - y.m) : x.when ? -1 : y.when ? 1 : x.r - y.r || x.m - y.m);
+  const sched = items.filter(x => x.when).length;
+  return `<div class="form">
+      <label>First match<input type="datetime-local" value="${esc(s.start)}" data-change="sched" data-key="start"></label>
+      <label>Minutes between<input type="number" min="1" style="width:80px" value="${esc(s.interval)}" data-change="sched" data-key="interval"></label>
+      <label>Courts / tables<input type="number" min="1" style="width:80px" value="${esc(s.courts)}" data-change="sched" data-key="courts"></label>
+      <label>Venue name<input type="text" style="width:130px" placeholder="Court" value="${esc(s.venue)}" data-change="sched" data-key="venue"></label>
+      <button data-click="fill">Fill unscheduled</button>
+      <button class="ghost" data-click="clearTimes">Clear all times</button>
+      <label>Match length (min)<input type="number" min="1" style="width:80px" value="${esc(t.duration)}" data-change="duration"></label>
+    </div>
+    <p class="note" style="margin:-6px 0 14px">${sched} of ${items.length} matches have a time. Each round starts after the previous one so no team plays twice at once. You can still edit any time below.</p>
+    <div class="list">${items.map(x => matchCard(t, x.r, x.m, `${roundName(t, x.r)} · match ${x.m + 1}`)).join('')}</div>`;
+}
+function shareHTML(t){
+  const ics = icsText(t).count;
+  const fileWarn = location.protocol === 'file:' ? `<p class="note">⚠ This page is open from a local file, so a link to it would not work for others. Paste the message instead, or host this .html file (SharePoint, GitHub Pages, ...) and share that link.</p>` : '';
+  return `<div class="card share" style="max-width:760px">
+      <h2>Message for Slack</h2>
+      <p class="note" style="margin:0 0 8px">Paste it into your group. It lists the teams, the schedule and results. Update results here, then copy it again to repost.</p>
+      <textarea id="slackmsg" readonly>${esc(slackText(t))}</textarea>
+      <div class="row">
+        <button data-click="copyMsg">Copy for Slack</button>
+        <button class="ghost" data-click="copyLink">Copy link</button>
+        <button class="ghost" data-click="ics"${ics ? '' : ' disabled'}>Calendar file (.ics) · ${ics}</button>
+      </div>
+      ${fileWarn}
+      <p class="note">The link carries the whole tournament inside it. Whoever opens it gets their own copy saved in their browser; results they enter are not synced back to you.</p>
+    </div>
+    <div class="card" style="max-width:760px">
+      <h2>Backup</h2>
+      <div class="row" style="margin-top:8px">
+        <button class="ghost" data-click="exportOne">Download this tournament</button>
+        <button class="ghost" data-click="exportAll">Backup everything</button>
+        <button class="ghost" data-click="importBtn">Import file</button>
+      </div>
+    </div>`;
+}
+
+function genPreviewHTML(){
+  const g = draft.gen, tt = { teams: g.teams };
+  const nm = id => teamName(tt, id);
+  return `<div class="card" style="margin-top:16px">
+      <h2>${g.rounds.length} matches for ${draft.players.length} players</h2>
+      <ol class="teams">${g.rounds.map((ms, i) => `<li><b>${esc(nm(ms[0].a))}</b> vs <b>${esc(nm(ms[0].b))}</b>${g.rests[i].length ? ` <span class="note">(out: ${esc(g.rests[i].join(', '))})</span>` : ''}</li>`).join('')}</ol>
+      <div class="row"><button class="ghost" data-click="draw">Re-shuffle</button><button data-click="create">Create tournament</button></div>
+    </div>`;
+}
+function setupHTML(){
+  const d = draft, manual = d.mode === 'manual', rot = d.format === 'rotation';
+  const chips = S.roster.length ? `<div class="chips">${S.roster.map(n => {
+    const on = (!manual || rot) &&parseNames(d.text).names.some(x => x.toLowerCase() === n.toLowerCase());
+    return `<span class="chip${on ? ' on' : ''}"><button data-click="chip" data-name="${esc(n)}">${esc(n)}</button><button class="x" data-click="forget" data-name="${esc(n)}" title="Forget">×</button></span>`;
+  }).join('')}</div>` : '<p class="note">Names you use get remembered here, so next time you just tap them.</p>';
+  const preview = rot ? (d.gen ? genPreviewHTML() : '') : d.teams ? `<div class="card" style="margin-top:16px">
+      <h2>${d.teams.length} teams</h2>
+      <ol class="teams">${d.teams.map(x => `<li class="${x.players.includes('Guest') ? 'guest' : ''}">${esc(x.players.join(' & '))}</li>`).join('')}</ol>
+      ${d.teams.some(x => x.players.includes('Guest')) ? '<p class="note guest">One team has a "Guest" because the numbers are odd. Add one more player to avoid it.</p>' : ''}
+      <div class="row">${manual ? '' : '<button class="ghost" data-click="draw">Re-draw partners</button>'}<button data-click="create">Create tournament</button></div>
+    </div>` : '';
+  return `<div class="card">
+      <h2>New doubles tournament</h2>
+      <label class="f">Tournament name</label>
+      <input type="text" id="dname" placeholder="Friday Ping Pong Doubles" value="${esc(d.name)}" data-input="name">
+      <label class="f">Format</label>
+      <div class="opts">
+        <label><input type="radio" name="fmt" value="rotation" data-change="fmt"${rot ? ' checked' : ''}> Rotating partners (6-7 mates, new random pairs every match)</label>
+        <label><input type="radio" name="fmt" value="knockout" data-change="fmt"${d.format === 'knockout' ? ' checked' : ''}> Knockout bracket (fixed teams)</label>
+        <label><input type="radio" name="fmt" value="roundrobin" data-change="fmt"${d.format === 'roundrobin' ? ' checked' : ''}> Round robin (fixed teams)</label>
+      </div>
+      ${rot ? `<label class="f">Number of matches</label><input type="number" min="1" max="30" style="width:90px" value="${esc(d.matches)}" data-change="matches">` : `<label class="f">Partners</label>
+      <div class="opts">
+        <label><input type="radio" name="mode" value="random" data-change="mode"${!manual ? ' checked' : ''}> Random draw from players</label>
+        <label><input type="radio" name="mode" value="manual" data-change="mode"${manual ? ' checked' : ''}> I'll choose the pairs</label>
+      </div>`}
+      <label class="f">${manual && !rot ? 'Teams, one per line (e.g. Alice &amp; Bob)' : 'Players, one per line'}</label>
+      <textarea id="dtext" data-input="text" placeholder="${manual && !rot ? 'Alice &amp; Bob&#10;Carol &amp; Dave' : 'Alice&#10;Bob&#10;Carol&#10;Dave&#10;Erin&#10;Frank'}">${esc(d.text)}</textarea>
+      ${chips}
+      ${d.format === 'knockout' ? `<div class="opts"><label><input type="checkbox" data-change="shuffle"${d.shuffle ? ' checked' : ''}> Shuffle bracket positions</label></div>` : ''}
+      ${d.errs.length ? `<ul class="msgs err">${d.errs.map(m => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}
+      ${d.msgs.length ? `<ul class="msgs">${d.msgs.map(m => `<li>${esc(m)}</li>`).join('')}</ul>` : ''}
+      <div class="row"><button data-click="draw">${rot ? 'Make the matches' : manual ? 'Preview teams' : 'Draw teams'}</button>${cur() ? '<button class="ghost" data-click="cancelNew">Cancel</button>' : ''}</div>
+    </div>${preview}`;
+}
+
+function render(){
+  const t = cur();
+  if (!t) view = 'setup';
+  if (view === 'standings' && t && t.format === 'knockout') view = 'bracket';
+  const sel = S.tournaments.length
+    ? `<select data-change="sel">${S.tournaments.map(x => `<option value="${esc(x.id)}"${x.id === S.currentId ? ' selected' : ''}>${esc(x.name)}</option>`).join('')}</select>` : '';
+  $('#hdr').innerHTML = `<h1>🏓 Doubles Bracket Maker</h1>${sel}<span class="spacer"></span>
+    <button class="ghost" data-click="importBtn">Import</button><button class="ghost" data-click="new">+ New</button>${t ? '<button class="danger" data-click="del">Delete</button>' : ''}`;
+  $('#banner').textContent = persistent ? '' : '⚠ Your browser is blocking saved data, so nothing will be remembered after you close this page. Use Share → Backup to keep your tournament.';
+  const sc = document.querySelector('.bracket,.rr'), sx = sc ? sc.scrollLeft : 0, sy = window.scrollY;
+  let html = '';
+  if (view === 'setup') html = setupHTML();
+  else {
+    const tabs = [['bracket', t.format === 'knockout' ? 'Bracket' : t.format === 'rotation' ? 'Matches' : 'Rounds'], ['schedule', 'Schedule'],
+      ...(t.format !== 'knockout' ? [['standings', t.format === 'rotation' ? 'Leaderboard' : 'Standings']] : []), ['share', 'Share to Slack']];
+    html = `<div class="tabs">${tabs.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-click="tab" data-view="${k}">${l}</button>`).join('')}</div>`;
+    if (view === 'bracket') html += champHTML(t) + bracketHTML(t);
+    else if (view === 'schedule') html += scheduleHTML(t);
+    else if (view === 'standings') html += champHTML(t) + standingsHTML(t);
+    else html += champHTML(t) + shareHTML(t);
+  }
+  $('#app').innerHTML = html;
+  const sc2 = document.querySelector('.bracket,.rr');
+  if (sc2) sc2.scrollLeft = sx;
+  window.scrollTo(0, sy);
+}
+function commit(){ save(); render(); }
+
+/* ---- setup actions ---- */
+function addToText(text, name, manual){
+  const lines = text.split('\n');
+  const norm = s => s.trim().replace(/\s+/g, ' ').toLowerCase(), low = norm(name);
+  if (!manual) {
+    if (parseNames(text).names.some(x => x.toLowerCase() === low)) {   // toggle off: drop only this name
+      return lines.map(l => l.split(/[,;]+/).filter(s => norm(s) !== low).map(s => s.trim()).filter(Boolean).join(', ')).filter(Boolean).join('\n');
+    }
+    return (text.trim() ? text.replace(/\s+$/, '') + '\n' : '') + name;
+  }
+  if (lines.some(l => l.split(/\s*(?:[&+/,]|\band\b)\s*/i).some(s => norm(s) === low))) return text;
+  const i = lines.map(l => l.trim()).reduce((p, l, k) => l ? k : p, -1);
+  if (i >= 0 && !/[&+/]|\band\b/i.test(lines[i])) { lines[i] = lines[i].trim() + ' & ' + name; return lines.join('\n'); }
+  return (text.trim() ? text.replace(/\s+$/, '') + '\n' : '') + name;
+}
+function doDraw(){
+  const d = draft;
+  d.msgs = []; d.errs = []; d.teams = null; d.gen = null;
+  if (d.format === 'rotation') {
+    const r = parseNames(d.text);
+    if (r.dups.length) d.msgs.push('Ignored duplicate name(s): ' + r.dups.join(', '));
+    const m = Math.floor(Number(d.matches));
+    if (r.names.length < 4) d.errs.push('Need at least 4 players for a doubles match.');
+    else if (r.names.length > 16) d.errs.push('Up to 16 players please.');
+    else if (!(m >= 1 && m <= 30)) d.errs.push('Number of matches must be between 1 and 30.');
+    else {
+      d.players = r.names;
+      d.gen = buildRotation(r.names, m);
+      const counts = r.names.map(p => d.gen.teams.filter(x => x.players.includes(p)).length);
+      const per = r.names.map(p => d.gen.rounds.filter((ms, i) => !d.gen.rests[i].includes(p)).length);
+      d.msgs.push('Games each: ' + r.names.map((p, i) => `${p} ${per[i]}`).join(', '));
+    }
+    return render();
+  }
+  let teams = [];
+  if (d.mode === 'manual') {
+    const r = parseTeams(d.text);
+    d.errs = r.errors; teams = r.teams;
+  } else {
+    const r = parseNames(d.text);
+    if (r.dups.length) d.msgs.push('Ignored duplicate name(s): ' + r.dups.join(', '));
+    teams = pairUp(r.names, true);
+  }
+  if (!d.errs.length && teams.length < 2) d.errs.push('Need at least 2 teams (4 players, or 3 players plus a guest).');
+  if (!d.errs.length) d.teams = teams;
+  render();
+}
+function doCreate(){
+  const d = draft;
+  const rot = d.format === 'rotation';
+  if (rot ? !d.gen : !d.teams) {              // list was edited after the preview: rebuild instead of silently ignoring the click
+    doDraw();
+    if (rot ? d.gen : d.teams) toast('Updated from your edits. Check it, then press Create.');
+    return;
+  }
+  const t = normalizeTournament(newTournament({ name: d.name.trim(), format: d.format, teams: d.teams, shuffle: d.shuffle, gen: d.gen, players: d.players }));
+  const roster = new Set(S.roster.map(x => x.toLowerCase()));
+  (rot ? d.gen.teams : d.teams).forEach(x => x.players.forEach(p => { if (p !== 'Guest' && !roster.has(p.toLowerCase())) { S.roster.push(p); roster.add(p.toLowerCase()); } }));
+  S.tournaments.unshift(t); S.currentId = t.id;
+  draft = freshDraft(); view = 'bracket';
+  commit();
+}
+
+/* ---- events (delegated, so no user text is ever put into inline handlers) ---- */
+document.addEventListener('click', async e => {
+  if (e.target.closest('input,select,textarea')) return;
+  const el = e.target.closest('[data-click]');
+  if (!el) return;
+  const t = cur(), ds = el.dataset;
+  switch (ds.click) {
+    case 'tab': view = ds.view; render(); break;
+    case 'new': draft = freshDraft(); view = 'setup'; render(); break;
+    case 'cancelNew': view = 'bracket'; render(); break;
+    case 'del':
+      if (t && confirm(`Delete "${t.name}"? This cannot be undone.`)) {
+        S.tournaments = S.tournaments.filter(x => x.id !== t.id);
+        S.currentId = S.tournaments[0] ? S.tournaments[0].id : null;
+        if (!S.currentId) { draft = freshDraft(); view = 'setup'; }
+        commit();
+      }
+      break;
+    case 'pick': setWinner(t, +ds.r, +ds.m, ds.team); commit(); break;
+    case 'draw': doDraw(); break;
+    case 'create': doCreate(); break;
+    case 'chip': draft.text = addToText(draft.text, ds.name, draft.mode === 'manual' && draft.format !== 'rotation'); draft.teams = null; draft.gen = null; render(); break;
+    case 'forget': S.roster = S.roster.filter(x => x !== ds.name); commit(); break;
+    case 'fill': {
+      const n = autoSchedule(t, t.sched);
+      if (!n && !parseLocal(t.sched.start)) toast('Pick a first match date and time');
+      else toast(n ? `Scheduled ${n} matches` : 'Nothing left to schedule');
+      commit(); break;
+    }
+    case 'clearTimes': if (confirm('Remove every match time and place?')) { clearSchedule(t); commit(); } break;
+    case 'copyMsg': toast(await copyText(slackText(t)) ? 'Copied. Paste it in Slack' : 'Copy failed: select the text and copy it'); break;
+    case 'copyLink':
+      try { toast(await copyText(location.href.split('#')[0] + '#t=' + await encodeShare(t)) ? 'Link copied' : 'Copy failed'); }
+      catch { toast('Could not build the link'); }
+      break;
+    case 'ics': {
+      const r = icsText(t);
+      if (r.count) download(fileName(t, '.ics'), r.text, 'text/calendar');
+      break;
+    }
+    case 'exportOne': download(fileName(t, '.json'), JSON.stringify(t, null, 2), 'application/json'); break;
+    case 'exportAll': download('bracket-maker-backup.json', JSON.stringify({ roster: S.roster, tournaments: S.tournaments }, null, 2), 'application/json'); break;
+    case 'importBtn': $('#file').click(); break;
+  }
+});
+document.addEventListener('input', e => {
+  const k = e.target.dataset && e.target.dataset.input;
+  if (k === 'name') draft.name = e.target.value;
+  else if (k === 'text') { draft.text = e.target.value; draft.teams = null; draft.gen = null; }
+});
+document.addEventListener('change', e => {
+  const el = e.target, ds = el.dataset, t = cur();
+  if (el.id === 'file') return importFile(el);
+  switch (ds.change) {
+    case 'sel': S.currentId = el.value; view = 'bracket'; commit(); break;
+    case 'score': setScore(t, +ds.r, +ds.m, ds.key, el.value); commit(); break;
+    case 'when': { const mt = t.rounds[+ds.r][+ds.m]; if (el.value) mt.when = el.value; else delete mt.when; commit(); break; }
+    case 'where': { const mt = t.rounds[+ds.r][+ds.m]; const v = el.value.trim(); if (v) mt.where = v; else delete mt.where; commit(); break; }
+    case 'sched': t.sched[ds.key] = el.value; save(); break;
+    case 'duration': t.duration = Math.max(1, Number(el.value) || 30); commit(); break;
+    case 'fmt': draft.format = el.value; draft.teams = null; draft.gen = null; draft.msgs = []; draft.errs = []; render(); break;
+    case 'mode': draft.mode = el.value; draft.teams = null; render(); break;
+    case 'matches': draft.matches = el.value; draft.gen = null; break;
+    case 'shuffle': draft.shuffle = el.checked; break;
+  }
+});
+
+/* ---- import / share-link loading ---- */
+function adopt(list, roster){
+  let added = 0, last = null;
+  for (let raw of list) {
+    raw = upgrade(raw);
+    if (!validTournament(raw)) continue;
+    const t = normalizeTournament(raw), i = S.tournaments.findIndex(x => x.id === t.id);
+    if (i >= 0) S.tournaments[i] = t; else S.tournaments.unshift(t);
+    added++; last = t;
+  }
+  if (Array.isArray(roster)) roster.filter(x => typeof x === 'string').forEach(n => { if (!S.roster.some(x => x.toLowerCase() === n.toLowerCase())) S.roster.push(n); });
+  if (last) { S.currentId = last.id; view = 'bracket'; }
+  return added;
+}
+function importFile(input){
+  const f = input.files[0];
+  if (!f) return;
+  f.text().then(txt => {
+    let n = 0;
+    try { const o = JSON.parse(txt); n = adopt(Array.isArray(o.tournaments) ? o.tournaments : [o], o.roster); } catch {}
+    if (n) { toast(`Imported ${n} tournament${n > 1 ? 's' : ''}`); commit(); } else toast('Not a valid bracket file');
+  });
+  input.value = '';
+}
+async function loadFromHash(){
+  const m = /^#t=([A-Za-z0-9_-]+)$/.exec(location.hash);
+  if (!m) return;
+  try {
+    const t = await decodeShare(m[1]);
+    if (adopt([t])) { save(); toast('Shared tournament loaded and saved'); }
+    else toast('That share link is not valid');
+  } catch { toast('That share link is not valid'); }
+  history.replaceState(null, '', location.pathname + location.search);
+}
+
+async function boot(){
+  S = loadState();
+  await loadFromHash();
+  if (cur()) view = 'bracket';
+  render();
+  window.addEventListener('hashchange', async () => {      // a share link opened in the already-open tab
+    if (!/^#t=/.test(location.hash)) return;
+    await loadFromHash();
+    if (cur()) view = 'bracket';
+    render();
+  });
+}
+
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { convertV1, buildRotation, playerStandings, parseNames, pairUp, parseTeams, seedOrder, buildKnockout, buildRoundRobin, newTournament, slot, winner, isBye, teamName, roundName,
+    setWinner, setScore, standings, champion, autoSchedule, clearSchedule, fmtWhen, fmtLocal, parseLocal, slackText, icsText, validTournament, normalizeTournament,
+    encodeShare, decodeShare, addToText };
+} else if (typeof document !== 'undefined') boot();
+</script>
+</body>
+</html>
