@@ -101,37 +101,49 @@
     [
       {
         "a": "3d6ofl9",
-        "b": "nbi4bsr"
+        "b": "nbi4bsr",
+        "when": "2026-10-09T15:30",
+        "where": ""
       }
     ],
     [
       {
         "a": "37ejysu",
-        "b": "geebeph"
+        "b": "geebeph",
+        "when": "2026-10-09T15:40",
+        "where": ""
       }
     ],
     [
       {
         "a": "rbsserc",
-        "b": "s5xx4k9"
+        "b": "s5xx4k9",
+        "when": "2026-10-09T15:50",
+        "where": ""
       }
     ],
     [
       {
         "a": "7ofl30s",
-        "b": "0wbhty0"
+        "b": "0wbhty0",
+        "when": "2026-10-09T16:00",
+        "where": ""
       }
     ],
     [
       {
         "a": "ra39qvr",
-        "b": "s89x3cl"
+        "b": "s89x3cl",
+        "when": "2026-10-09T16:10",
+        "where": ""
       }
     ],
     [
       {
         "a": "z8hzlmp",
-        "b": "dmkqait"
+        "b": "dmkqait",
+        "when": "2026-10-09T16:20",
+        "where": ""
       }
     ]
   ],
@@ -169,8 +181,8 @@
   ],
   "duration": 30,
   "sched": {
-    "start": "",
-    "interval": 30,
+    "start": "2026-10-09T15:30",
+    "interval": 10,
     "courts": 1,
     "venue": ""
   }
