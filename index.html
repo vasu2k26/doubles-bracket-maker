@@ -180,8 +180,10 @@ function buildRoundRobin(teamIds){
 // Rotating partners ("americano"): every match is a fresh random 2v2 from the whole group.
 // Each match picks the 4 players who have played least, then the split into pairs that repeats
 // partners/opponents least. Many random trials, keep the fairest.
-function buildRotation(players, matches, rng = Math.random){
+// `history` = matches already played [{p:[n1,n2], o:[n3,n4]}] so a rebuild stays fair to what happened before.
+function buildRotation(players, matches, rng = Math.random, history = []){
   const n = players.length;
+  const at = new Map(players.map((p, i) => [p, i]));
   const combos = [];
   for (let a = 0; a < n; a++) for (let b = a + 1; b < n; b++) for (let c = b + 1; c < n; c++) for (let d = c + 1; d < n; d++) combos.push([a, b, c, d]);
   let best = null;
@@ -189,6 +191,12 @@ function buildRotation(players, matches, rng = Math.random){
     const played = new Array(n).fill(0), lastRest = new Array(n).fill(0);
     const partner = Array.from({ length: n }, () => new Array(n).fill(0)), opp = Array.from({ length: n }, () => new Array(n).fill(0));
     const seq = []; let total = 0;
+    for (const h of history) {
+      const P = h.p.map(x => at.get(x)), O = h.o.map(x => at.get(x));
+      [...P, ...O].forEach(i => { if (i !== undefined) played[i]++; });
+      for (const pair of [P, O]) if (pair[0] !== undefined && pair[1] !== undefined) { partner[pair[0]][pair[1]]++; partner[pair[1]][pair[0]]++; }
+      for (const x of P) for (const y of O) if (x !== undefined && y !== undefined) { opp[x][y]++; opp[y][x]++; }
+    }
     for (let k = 0; k < matches; k++) {
       let pick = null;
       for (const q of combos) {
@@ -223,6 +231,38 @@ function buildRotation(players, matches, rng = Math.random){
     rests.push(players.filter((_, i) => !on.has(i)));
   });
   return { teams, rounds, rests };
+}
+// Someone can't come / arrives late / a replacement joins: keep every match already played and
+// re-draw the unplayed ones for whoever is present. Unplayed matches hand their time slots on.
+function rebuildRotation(t, present, count, rng = Math.random){
+  if (present.length < 4) return { error: 'Need at least 4 players present.' };
+  if (!(count >= 1 && count <= 30)) return { error: 'Matches to play must be between 1 and 30.' };
+  const names = t.players.slice();
+  present.forEach(p => { if (!names.includes(p)) names.push(p); });
+  const played = [], free = [];
+  t.rounds.forEach((ms, r) => { const mt = ms[0]; ((winner(t, r, 0) || Number.isFinite(mt.sa) || Number.isFinite(mt.sb)) ? played : free).push(r); });
+  const byId = new Map(t.teams.map(x => [x.id, x]));
+  const history = played.map(r => ({ p: byId.get(t.rounds[r][0].a).players, o: byId.get(t.rounds[r][0].b).players }));
+  const gen = buildRotation(present, count, rng, history);
+  const key = pl => pl.slice().sort((x, y) => x.localeCompare(y)).join('\u0000');
+  const teams = t.teams.filter(x => played.some(r => t.rounds[r][0].a === x.id || t.rounds[r][0].b === x.id));
+  const have = new Map(teams.map(x => [key(x.players), x.id])), remap = new Map();
+  gen.teams.forEach(x => {
+    const k = key(x.players);
+    if (have.has(k)) remap.set(x.id, have.get(k)); else { teams.push(x); have.set(k, x.id); }
+  });
+  const slots = free.map(r => ({ when: t.rounds[r][0].when, where: t.rounds[r][0].where }));
+  const rounds = played.map(r => t.rounds[r]);
+  const rests = played.map(r => (t.rests || [])[r] || []);
+  gen.rounds.forEach((ms, i) => {
+    const m = { a: remap.get(ms[0].a) || ms[0].a, b: remap.get(ms[0].b) || ms[0].b };
+    if (slots[i] && slots[i].when) m.when = slots[i].when;
+    if (slots[i] && slots[i].where) m.where = slots[i].where;
+    rounds.push([m]); rests.push(gen.rests[i]);
+  });
+  t.players = names; t.teams = teams; t.rounds = rounds; t.rests = rests;
+  t.absent = names.filter(p => !present.includes(p));
+  return { ok: true, kept: played.length, rebuilt: gen.rounds.length };
 }
 // per-player table for rotation tournaments
 function playerStandings(t){
@@ -407,8 +447,9 @@ function matchLine(t, r, m){
 function slackText(t){
   const L = [];
   if (t.format === 'rotation') {
-    L.push(`:trophy: *${t.name}* — rotating-partner doubles, ${t.players.length} players, ${t.rounds.length} matches`);
-    L.push('', `*Players*: ${t.players.join(', ')}`);
+    L.push(`:trophy: *${t.name}* — rotating-partner doubles, ${t.players.length - (t.absent || []).length} players, ${t.rounds.length} matches`);
+    L.push('', `*Players*: ${t.players.filter(p => !(t.absent || []).includes(p)).join(', ')}`);
+    if (t.absent && t.absent.length) L.push(`*Not playing*: ${t.absent.join(', ')}`);
     const lb = playerStandings(t);
     if (lb.some(x => x.P > 0)) {
       L.push('', '*Leaderboard*', '```');
@@ -486,6 +527,7 @@ function validTournament(t){
     if (!['knockout', 'roundrobin', 'rotation'].includes(t.format)) return false;
     if (t.format === 'rotation') {
       if (!Array.isArray(t.players) || !t.players.every(p => typeof p === 'string')) return false;
+      if (t.absent !== undefined && !(Array.isArray(t.absent) && t.absent.every(p => typeof p === 'string'))) return false;
       if (t.rests !== undefined && !(Array.isArray(t.rests) && t.rests.every(r => Array.isArray(r) && r.every(p => typeof p === 'string')))) return false;
     }
     if (!Array.isArray(t.teams) || t.teams.length < 2 || t.teams.length > 128) return false;
@@ -575,6 +617,7 @@ const KEY = 'bracketmaker.v2';
 // and re-checks it every minute. Nothing is read from or written to the visitor's browser storage.
 const VIEW = typeof location !== 'undefined' && /[?&]view=live\b/.test(location.search);
 let liveStamp = '', liveMsg = 'Loading...';
+let ppanel = null;                       // "Who is playing?" panel state (rotation tournaments)
 let S, view = 'setup', persistent = true;
 let draft = freshDraft();
 
@@ -663,6 +706,23 @@ function bracketHTML(t){
     const rest = t.format === 'rotation' && t.rests && t.rests[r] && t.rests[r].length ? `<div class="note" style="margin:6px 2px 0">Sitting out: ${esc(t.rests[r].join(', '))}</div>` : '';
     return `<div class="rrround"><h3>${roundName(t, r)}</h3><div class="matches">${ms.map((_, m) => matchCard(t, r, m)).join('')}</div>${rest}</div>`;
   }).join('')}</div>`;
+}
+function unplayedCount(t){
+  let n = 0;
+  t.rounds.forEach((ms, r) => { const mt = ms[0]; if (!(winner(t, r, 0) || Number.isFinite(mt.sa) || Number.isFinite(mt.sb))) n++; });
+  return n;
+}
+function playersPanelHTML(t){
+  if (!ppanel) return `<div class="row" style="margin:0 0 14px"><button class="ghost" data-click="ppanel">👥 Change players / rebuild remaining matches</button>${t.absent && t.absent.length ? `<span class="note" style="margin:0">Not playing: ${esc(t.absent.join(', '))}</span>` : ''}</div>`;
+  const left = unplayedCount(t);
+  return `<div class="card" style="max-width:760px;margin:0 0 16px">
+    <h2>Who is playing?</h2>
+    <p class="note" style="margin:0 0 8px">Untick anyone who can't come, add a replacement, then rebuild. Matches already played stay exactly as they are. The ${left} unplayed matches are re-drawn and keep their time slots. Someone late? Leave them out now, and run this again when they arrive.</p>
+    <div class="opts">${ppanel.names.map(n => `<label><input type="checkbox" data-change="ppresent" data-name="${esc(n)}"${ppanel.on[n] ? ' checked' : ''}> ${esc(n)}</label>`).join('')}</div>
+    <div class="row"><input type="text" placeholder="Add a player" value="${esc(ppanel.newName)}" data-input="pnew"><button class="ghost" data-click="padd">Add</button></div>
+    <div class="row"><label>Matches to play <input type="number" min="1" max="30" style="width:80px" value="${esc(ppanel.count)}" data-change="pcount"></label>
+      <button data-click="prebuild">Rebuild remaining matches</button><button class="ghost" data-click="ppanel">Cancel</button></div>
+  </div>`;
 }
 function standingsHTML(t){
   if (t.format === 'rotation') {
@@ -767,7 +827,7 @@ function setupHTML(){
 function render(){
   const t = cur();
   if (VIEW) {
-    $('#hdr').innerHTML = `<h1>🏓 ${esc(t ? t.name : 'Doubles Bracket Maker')}</h1><span class="spacer"></span><span class="note" style="margin:0">Live view · <span id="stamp">${esc(liveStamp)}</span></span>`;
+    $('#hdr').innerHTML = `<h1>🏓 ${esc(t ? t.name : 'Doubles Bracket Maker')}</h1><span class="spacer"></span><span class="note" style="margin:0">Live view · <span id="stamp">${esc(liveStamp)}</span></span><a href="./" style="color:var(--accent);font-weight:600">Open the editor / make your own</a>`;
     $('#banner').textContent = '';
     if (!t) { $('#app').innerHTML = `<div class="card"><h2>No live tournament yet</h2><p class="note">${esc(liveMsg)}</p></div>`; return; }
     if (view === 'setup') view = 'bracket';
@@ -786,7 +846,7 @@ function render(){
     const tabs = [['bracket', t.format === 'knockout' ? 'Bracket' : t.format === 'rotation' ? 'Matches' : 'Rounds'], ['schedule', 'Schedule'],
       ...(t.format !== 'knockout' ? [['standings', t.format === 'rotation' ? 'Leaderboard' : 'Standings']] : []), ['share', 'Share to Slack']];
     html = `<div class="tabs">${tabs.map(([k, l]) => `<button class="${view === k ? 'on' : ''}" data-click="tab" data-view="${k}">${l}</button>`).join('')}</div>`;
-    if (view === 'bracket') html += champHTML(t) + bracketHTML(t);
+    if (view === 'bracket') html += champHTML(t) + (t.format === 'rotation' && !VIEW ? playersPanelHTML(t) : (VIEW && t.absent && t.absent.length ? `<p class="note">Not playing: ${esc(t.absent.join(', '))}</p>` : '')) + bracketHTML(t);
     else if (view === 'schedule') html += scheduleHTML(t);
     else if (view === 'standings') html += champHTML(t) + standingsHTML(t);
     else html += champHTML(t) + shareHTML(t);
@@ -870,7 +930,25 @@ document.addEventListener('click', async e => {
   if (VIEW && !['tab', 'copyMsg', 'copyLink', 'ics'].includes(ds.click)) return;     // read-only page
   switch (ds.click) {
     case 'tab': view = ds.view; render(); break;
-    case 'new': draft = freshDraft(); view = 'setup'; render(); break;
+    case 'new': draft = freshDraft(); view = 'setup'; ppanel = null; render(); break;
+    case 'ppanel':
+      ppanel = ppanel ? null : { names: t.players.slice(), on: Object.fromEntries(t.players.map(p => [p, !(t.absent || []).includes(p)])), newName: '', count: unplayedCount(t) || 3 };
+      render(); break;
+    case 'padd': {
+      const n = ppanel.newName.trim().replace(/\s+/g, ' ');
+      if (!n) { toast('Type a name first'); break; }
+      const have = ppanel.names.find(x => x.toLowerCase() === n.toLowerCase());
+      if (have) ppanel.on[have] = true; else { ppanel.names.push(n); ppanel.on[n] = true; }
+      ppanel.newName = ''; render(); break;
+    }
+    case 'prebuild': {
+      const present = ppanel.names.filter(n => ppanel.on[n]);
+      const r = rebuildRotation(t, present, Math.floor(Number(ppanel.count)));
+      if (r.error) { toast(r.error); break; }
+      ppanel = null; commit();
+      toast(`Rebuilt ${r.rebuilt} matches, kept ${r.kept} already played`);
+      break;
+    }
     case 'cancelNew': view = 'bracket'; render(); break;
     case 'del':
       if (t && confirm(`Delete "${t.name}"? This cannot be undone.`)) {
@@ -910,7 +988,8 @@ document.addEventListener('click', async e => {
 });
 document.addEventListener('input', e => {
   const k = e.target.dataset && e.target.dataset.input;
-  if (k === 'name') draft.name = e.target.value;
+  if (k === 'pnew' && ppanel) ppanel.newName = e.target.value;
+  else if (k === 'name') draft.name = e.target.value;
   else if (k === 'text') { draft.text = e.target.value; draft.teams = null; draft.gen = null; }
 });
 document.addEventListener('change', e => {
@@ -918,7 +997,9 @@ document.addEventListener('change', e => {
   const el = e.target, ds = el.dataset, t = cur();
   if (el.id === 'file') return importFile(el);
   switch (ds.change) {
-    case 'sel': S.currentId = el.value; view = 'bracket'; commit(); break;
+    case 'sel': S.currentId = el.value; view = 'bracket'; ppanel = null; commit(); break;
+    case 'ppresent': ppanel.on[ds.name] = el.checked; break;
+    case 'pcount': ppanel.count = el.value; break;
     case 'score': setScore(t, +ds.r, +ds.m, ds.key, el.value); commit(); break;
     case 'when': { const mt = t.rounds[+ds.r][+ds.m]; if (el.value) mt.when = el.value; else delete mt.when; commit(); break; }
     case 'where': { const mt = t.rounds[+ds.r][+ds.m]; const v = el.value.trim(); if (v) mt.where = v; else delete mt.where; commit(); break; }
@@ -966,9 +1047,20 @@ async function loadFromHash(){
   history.replaceState(null, '', location.pathname + location.search);
 }
 
+// first visit with nothing saved: start with the published game (tournament.json next to this page) so it is ready to edit
+async function seedFromPublished(){
+  if (!/^https?:$/.test(location.protocol)) return;
+  try { if (localStorage.getItem('bracketmaker.seeded')) return; } catch {}
+  try {
+    const r = await fetch('tournament.json', { cache: 'no-store' });
+    if (r.ok && adopt([await r.json()])) save();
+  } catch {}
+  try { localStorage.setItem('bracketmaker.seeded', '1'); } catch {}
+}
 async function boot(){
   S = loadState();
   await loadFromHash();
+  if (!S.tournaments.length) await seedFromPublished();
   if (cur()) view = 'bracket';
   render();
   window.addEventListener('hashchange', async () => {      // a share link opened in the already-open tab
@@ -1003,7 +1095,7 @@ async function bootLive(){
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { convertV1, buildRotation, playerStandings, parseNames, pairUp, parseTeams, seedOrder, buildKnockout, buildRoundRobin, newTournament, slot, winner, isBye, teamName, roundName,
+  module.exports = { rebuildRotation, convertV1, buildRotation, playerStandings, parseNames, pairUp, parseTeams, seedOrder, buildKnockout, buildRoundRobin, newTournament, slot, winner, isBye, teamName, roundName,
     setWinner, setScore, standings, champion, autoSchedule, clearSchedule, fmtWhen, fmtLocal, parseLocal, slackText, icsText, validTournament, normalizeTournament,
     encodeShare, decodeShare, addToText };
 } else if (typeof document !== 'undefined') { if (VIEW) bootLive(); else boot(); }
